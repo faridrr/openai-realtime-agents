@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useTranscript } from "@/app/contexts/TranscriptContext";
+import Image from "next/image";
 
 export type Property = {
   title?: string;
@@ -75,11 +76,12 @@ function PropertyCard({ property }: { property: Property }) {
     <div className="w-full rounded-2xl border border-gray-200 bg-white shadow-sm p-3 flex items-center gap-4">
       <div className="relative w-36 h-28 flex-shrink-0 overflow-hidden rounded-xl">
         {images.length > 0 && (
-          <img
+          <Image
             src={images[index]}
             alt={property.title ?? "Property image"}
             className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         )}
 

@@ -7,7 +7,7 @@ import Image from "next/image";
 
 // UI components
 import Transcript from "./components/Transcript";
-import Events from "./components/Events";
+// import Events from "./components/Events";
 import BottomToolbar from "./components/BottomToolbar";
 
 // Types
@@ -102,8 +102,7 @@ function App() {
   );
 
   // Initialize the recording hook.
-  const { startRecording, stopRecording, downloadRecording } =
-    useAudioDownload();
+  const { startRecording, stopRecording } = useAudioDownload();
 
   const sendClientEvent = (eventObj: any, eventNameSuffix = "") => {
     try {
@@ -314,12 +313,12 @@ function App() {
     }
   };
 
-  // Because we need a new connection, refresh the page when codec changes
-  const handleCodecChange = (newCodec: string) => {
-    const url = new URL(window.location.toString());
-    url.searchParams.set("codec", newCodec);
-    window.location.replace(url.toString());
-  };
+  // // Because we need a new connection, refresh the page when codec changes
+  // const handleCodecChange = (newCodec: string) => {
+  //   const url = new URL(window.location.toString());
+  //   url.searchParams.set("codec", newCodec);
+  //   window.location.replace(url.toString());
+  // };
 
   useEffect(() => {
     const storedPushToTalkUI = localStorage.getItem("pushToTalkUI");
@@ -428,7 +427,6 @@ function App() {
           userText={userText}
           setUserText={setUserText}
           onSendMessage={handleSendTextMessage}
-          downloadRecording={downloadRecording}
           canSend={sessionStatus === "CONNECTED"}
         />
 

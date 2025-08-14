@@ -5,7 +5,6 @@ import ReactMarkdown from "react-markdown";
 import { TranscriptItem } from "@/app/types";
 import Image from "next/image";
 import { useTranscript } from "@/app/contexts/TranscriptContext";
-import { DownloadIcon, ClipboardCopyIcon } from "@radix-ui/react-icons";
 import { GuardrailChip } from "./GuardrailChip";
 import PropertyCards from "./PropertyCards";
 
@@ -14,7 +13,6 @@ export interface TranscriptProps {
   setUserText: (val: string) => void;
   onSendMessage: () => void;
   canSend: boolean;
-  downloadRecording: () => void;
 }
 
 function Transcript({
@@ -22,12 +20,11 @@ function Transcript({
   setUserText,
   onSendMessage,
   canSend,
-  downloadRecording,
 }: TranscriptProps) {
   const { transcriptItems, toggleTranscriptItemExpand } = useTranscript();
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const [prevLogs, setPrevLogs] = useState<TranscriptItem[]>([]);
-  const [justCopied, setJustCopied] = useState(false);
+
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   function scrollToBottom() {
@@ -59,17 +56,6 @@ function Transcript({
       inputRef.current.focus();
     }
   }, [canSend]);
-
-  const handleCopyTranscript = async () => {
-    if (!transcriptRef.current) return;
-    try {
-      await navigator.clipboard.writeText(transcriptRef.current.innerText);
-      setJustCopied(true);
-      setTimeout(() => setJustCopied(false), 1500);
-    } catch (error) {
-      console.error("Failed to copy transcript:", error);
-    }
-  };
 
   return (
     <div className="flex flex-col flex-1 bg-white min-h-0 rounded-xl">
