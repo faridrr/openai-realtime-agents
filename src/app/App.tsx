@@ -8,7 +8,6 @@ import Image from "next/image";
 // UI components
 import Transcript from "./components/Transcript";
 // import Events from "./components/Events";
-import BottomToolbar from "./components/BottomToolbar";
 
 // Types
 import { SessionStatus } from "@/app/types";
@@ -22,12 +21,14 @@ import { createModerationGuardrail } from "@/app/agentConfigs/guardrails";
 
 // Agent configs
 import { allAgentSets, defaultAgentSetKey } from "@/app/agentConfigs";
-import { realEstateScenario } from "@/app/agentConfigs/realEstate";
-import { realEstateCompanyName } from "@/app/agentConfigs/realEstate";
+import {
+  createRealEstateAgent,
+  realEstateCompanyName,
+} from "@/app/agentConfigs/realEstate";
 
 // Map used by connect logic for scenarios defined via the SDK.
 const sdkScenarioMap: Record<string, RealtimeAgent[]> = {
-  realEstate: realEstateScenario,
+  realEstate: [createRealEstateAgent()],
 };
 
 import useAudioDownload from "./hooks/useAudioDownload";
@@ -60,21 +61,26 @@ function App() {
   // Ref to identify whether the latest agent switch came from an automatic handoff
   const handoffTriggeredRef = useRef(false);
 
-  const sdkAudioElement = React.useMemo(() => {
-    if (typeof window === "undefined") return undefined;
+  // Create and attach the SDK audio element after hydration to avoid
+  // mutating <body> during render, which can cause hydration mismatches.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (audioElementRef.current) return;
+
     const el = document.createElement("audio");
     el.autoplay = true;
     el.style.display = "none";
     document.body.appendChild(el);
-    return el;
-  }, []);
+    audioElementRef.current = el;
 
-  // Attach SDK audio element once it exists (after first render in browser)
-  useEffect(() => {
-    if (sdkAudioElement && !audioElementRef.current) {
-      audioElementRef.current = sdkAudioElement;
-    }
-  }, [sdkAudioElement]);
+    return () => {
+      try {
+        el.remove();
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
 
   const { connect, disconnect, sendUserText, sendEvent, interrupt, mute } =
     useRealtimeSession({
@@ -91,7 +97,7 @@ function App() {
   const [isEventsPaneExpanded, setIsEventsPaneExpanded] =
     useState<boolean>(true);
   const [userText, setUserText] = useState<string>("");
-  const [isPTTActive, setIsPTTActive] = useState<boolean>(false);
+  const [isPTTActive, setIsPTTActive] = useState<boolean>(true);
   const [isPTTUserSpeaking, setIsPTTUserSpeaking] = useState<boolean>(false);
   const [isAudioPlaybackEnabled, setIsAudioPlaybackEnabled] = useState<boolean>(
     () => {
@@ -206,7 +212,7 @@ function App() {
         await connect({
           getEphemeralKey: async () => EPHEMERAL_KEY,
           initialAgents: reorderedAgents,
-          audioElement: sdkAudioElement,
+          audioElement: audioElementRef.current ?? undefined,
           outputGuardrails: [guardrail],
           extraContext: {
             addTranscriptBreadcrumb,
@@ -428,24 +434,14 @@ function App() {
           setUserText={setUserText}
           onSendMessage={handleSendTextMessage}
           canSend={sessionStatus === "CONNECTED"}
+          isPTTActive={isPTTActive}
+          isPTTUserSpeaking={isPTTUserSpeaking}
+          handleTalkButtonDown={handleTalkButtonDown}
+          handleTalkButtonUp={handleTalkButtonUp}
         />
 
         {/* <Events isExpanded={isEventsPaneExpanded} /> */}
       </div>
-
-      <BottomToolbar
-        sessionStatus={sessionStatus}
-        onToggleConnection={onToggleConnection}
-        isPTTActive={isPTTActive}
-        setIsPTTActive={setIsPTTActive}
-        isPTTUserSpeaking={isPTTUserSpeaking}
-        handleTalkButtonDown={handleTalkButtonDown}
-        handleTalkButtonUp={handleTalkButtonUp}
-        isEventsPaneExpanded={isEventsPaneExpanded}
-        setIsEventsPaneExpanded={setIsEventsPaneExpanded}
-        isAudioPlaybackEnabled={isAudioPlaybackEnabled}
-        setIsAudioPlaybackEnabled={setIsAudioPlaybackEnabled}
-      />
     </div>
   );
 }

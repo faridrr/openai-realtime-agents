@@ -16,15 +16,24 @@ type TranscriptContextValue = {
     itemId: string,
     role: "user" | "assistant",
     text: string,
-    isHidden?: boolean,
+    isHidden?: boolean
   ) => void;
-  updateTranscriptMessage: (itemId: string, text: string, isDelta: boolean) => void;
+  updateTranscriptMessage: (
+    itemId: string,
+    text: string,
+    isDelta: boolean
+  ) => void;
   addTranscriptBreadcrumb: (title: string, data?: Record<string, any>) => void;
   toggleTranscriptItemExpand: (itemId: string) => void;
-  updateTranscriptItem: (itemId: string, updatedProperties: Partial<TranscriptItem>) => void;
+  updateTranscriptItem: (
+    itemId: string,
+    updatedProperties: Partial<TranscriptItem>
+  ) => void;
 };
 
-const TranscriptContext = createContext<TranscriptContextValue | undefined>(undefined);
+const TranscriptContext = createContext<TranscriptContextValue | undefined>(
+  undefined
+);
 
 export const TranscriptProvider: FC<PropsWithChildren> = ({ children }) => {
   const [transcriptItems, setTranscriptItems] = useState<TranscriptItem[]>([]);
@@ -41,10 +50,17 @@ export const TranscriptProvider: FC<PropsWithChildren> = ({ children }) => {
     return `${time}.${ms}`;
   }
 
-  const addTranscriptMessage: TranscriptContextValue["addTranscriptMessage"] = (itemId, role, text = "", isHidden = false) => {
+  const addTranscriptMessage: TranscriptContextValue["addTranscriptMessage"] = (
+    itemId,
+    role,
+    text = "",
+    isHidden = false
+  ) => {
     setTranscriptItems((prev) => {
       if (prev.some((log) => log.itemId === itemId && log.type === "MESSAGE")) {
-        console.warn(`[addTranscriptMessage] skipping; message already exists for itemId=${itemId}, role=${role}, text=${text}`);
+        console.warn(
+          `[addTranscriptMessage] skipping; message already exists for itemId=${itemId}, role=${role}, text=${text}`
+        );
         return prev;
       }
 
@@ -55,7 +71,7 @@ export const TranscriptProvider: FC<PropsWithChildren> = ({ children }) => {
         title: text,
         expanded: false,
         timestamp: newTimestampPretty(),
-        createdAtMs: Date.now(),
+        createdAtMs: new Date().getTime(),
         status: "IN_PROGRESS",
         isHidden,
       };
@@ -64,46 +80,52 @@ export const TranscriptProvider: FC<PropsWithChildren> = ({ children }) => {
     });
   };
 
-  const updateTranscriptMessage: TranscriptContextValue["updateTranscriptMessage"] = (itemId, newText, append = false) => {
-    setTranscriptItems((prev) =>
-      prev.map((item) => {
-        if (item.itemId === itemId && item.type === "MESSAGE") {
-          return {
-            ...item,
-            title: append ? (item.title ?? "") + newText : newText,
-          };
-        }
-        return item;
-      })
-    );
-  };
+  const updateTranscriptMessage: TranscriptContextValue["updateTranscriptMessage"] =
+    (itemId, newText, append = false) => {
+      setTranscriptItems((prev) =>
+        prev.map((item) => {
+          if (item.itemId === itemId && item.type === "MESSAGE") {
+            return {
+              ...item,
+              title: append ? (item.title ?? "") + newText : newText,
+            };
+          }
+          return item;
+        })
+      );
+    };
 
-  const addTranscriptBreadcrumb: TranscriptContextValue["addTranscriptBreadcrumb"] = (title, data) => {
-    setTranscriptItems((prev) => [
-      ...prev,
-      {
-        itemId: `breadcrumb-${uuidv4()}`,
-        type: "BREADCRUMB",
-        title,
-        data,
-        expanded: false,
-        timestamp: newTimestampPretty(),
-        createdAtMs: Date.now(),
-        status: "DONE",
-        isHidden: false,
-      },
-    ]);
-  };
+  const addTranscriptBreadcrumb: TranscriptContextValue["addTranscriptBreadcrumb"] =
+    (title, data) => {
+      setTranscriptItems((prev) => [
+        ...prev,
+        {
+          itemId: `breadcrumb-${uuidv4()}`,
+          type: "BREADCRUMB",
+          title,
+          data,
+          expanded: false,
+          timestamp: newTimestampPretty(),
+          createdAtMs: new Date().getTime(),
+          status: "DONE",
+          isHidden: false,
+        },
+      ]);
+    };
 
-  const toggleTranscriptItemExpand: TranscriptContextValue["toggleTranscriptItemExpand"] = (itemId) => {
-    setTranscriptItems((prev) =>
-      prev.map((log) =>
-        log.itemId === itemId ? { ...log, expanded: !log.expanded } : log
-      )
-    );
-  };
+  const toggleTranscriptItemExpand: TranscriptContextValue["toggleTranscriptItemExpand"] =
+    (itemId) => {
+      setTranscriptItems((prev) =>
+        prev.map((log) =>
+          log.itemId === itemId ? { ...log, expanded: !log.expanded } : log
+        )
+      );
+    };
 
-  const updateTranscriptItem: TranscriptContextValue["updateTranscriptItem"] = (itemId, updatedProperties) => {
+  const updateTranscriptItem: TranscriptContextValue["updateTranscriptItem"] = (
+    itemId,
+    updatedProperties
+  ) => {
     setTranscriptItems((prev) =>
       prev.map((item) =>
         item.itemId === itemId ? { ...item, ...updatedProperties } : item

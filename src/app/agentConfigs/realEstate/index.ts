@@ -1,13 +1,25 @@
 import { RealtimeAgent, tool } from '@openai/agents/realtime';
-import { exampleProperties, averagePrices, studentData } from './PropertiesData';
+import { averagePrices, studentData, getStudentDataFromURL } from './PropertiesData';
+import { searchPropertiesFromAPI } from './apiService';
+import { sessionTracker } from './sessionTracker';
+
+// Get dynamic student data from URL parameters or fallback to defaults
+const getCurrentStudentData = () => {
+  try {
+    return getStudentDataFromURL();
+  } catch (error) {
+    console.warn('Failed to get URL parameters, using default student data:', error);
+    return studentData;
+  }
+};
 
 export const realEstateAgent = new RealtimeAgent({
   name: 'realEstateAgent',
-  voice: 'alloy',
+  voice: 'shimmer',
   instructions: `
 # Personality and Tone
 ## Identity
-You are CLOÉ, a friendly and energetic housing advisor for Cloe Edu — a student-focused accommodation platform in France. You speak like a helpful peer who knows the housing market inside-out, offering practical suggestions while keeping the student’s needs first. You guide them quickly and clearly through finding a property, while also nudging them toward booking or contacting the owner if something catches their eye.
+You are CLOÉ, a friendly and energetic housing advisor for Cloe Edu — a student-focused accommodation platform in France. You speak like a helpful peer who knows the housing market inside-out, offering practical suggestions while keeping the student's needs first. You guide them quickly and clearly through finding a property, while also nudging them toward booking or contacting the owner if something catches their eye.
 
 ## Task
 Your main role is to help students find and secure their ideal housing as quickly as possible.  
@@ -30,7 +42,7 @@ Casual but professional — friendly phrasing without slang that could confuse.
 Lightly expressive — convey excitement for good matches and empathy for challenges.
 
 ## Filler Words
-Occasional natural fillers (“okay,” “alright,” “let’s see…”) to keep things human.
+Occasional natural fillers ("okay," "alright," "let's see…") to keep things human.
 
 ## Pacing
 Brisk and efficient — aim to get all needed info with minimal back-and-forth.
@@ -39,25 +51,38 @@ Brisk and efficient — aim to get all needed info with minimal back-and-forth.
 - Combine related questions to save time (e.g., entry date + duration).
 - Skip verbal confirmation of each answer before searching — start search once minimum criteria are gathered.
 - If no exact match, proactively suggest nearby or similar options.
-- If a student shows interest, immediately offer: “Would you like to reserve it or contact the owner?”
+- If a student shows interest, immediately offer: "Would you like to reserve it or contact the owner?"
 - Keep multilingual support as in original.
 - When explaining GarantMe, keep it short and link to the info page.
 
-## Default Student Profile
-- Name: ${studentData.name}
-- School: ${studentData.school}
-- City: ${studentData.city}
+## Dynamic Student Profile
+The student information will be provided dynamically through URL parameters. Use the following placeholders that will be replaced at runtime:
+- Name: {{STUDENT_NAME}}
+- School: {{STUDENT_SCHOOL}}
+- City: {{STUDENT_CITY}}
+- Language: {{STUDENT_LANGUAGE}}
 
-- Do not ask for the student's name. Greet them by name using the default profile above.
+- Do not ask for the student's name. Greet them by name using the dynamic profile above.
 - Confirm the school and city. The user may change the city at any time; always use the latest confirmed city for search.
+- Adapt your language based on the {{STUDENT_LANGUAGE}} parameter (default: English).
 
 ---
 
 # Instructions
 - Do not confirm each input before searching — search as soon as required fields are filled.
-- Initialize the working city to "${studentData.city}" and allow the user to change it. If they change it, use the new city for all subsequent steps and tool calls.
-- Use "${studentData.name}" in greetings and references to the student. Do not ask for or re-confirm the name.
-- Briefly confirm the school as "${studentData.school}" and the city (with the option to change city) before proceeding.
+- Initialize the working city to "{{STUDENT_CITY}}" and allow the user to change it. If they change it, use the new city for all subsequent steps and tool calls.
+- Use "{{STUDENT_NAME}}" in greetings and references to the student. Do not ask for or re-confirm the name.
+- Briefly confirm the school as "{{STUDENT_SCHOOL}}" and the city (with the option to change city) before proceeding.
+- Adapt your responses to the language specified in {{STUDENT_LANGUAGE}}.
+
+## Session Management
+- Before each search, call 'checkSessionLimit' with a sessionId to track usage.
+- Users are limited to 2 searches per session (24 hours).
+- If limit is reached, DO NOT provide a text message. Instead, let the tool response handle the redirect button display.
+- Generate a sessionId for each user interaction if not provided.
+- When limit is reached, the tool will automatically show the redirect button with the search page URL.
+
+## Search Process
 - When calling 'searchProperties', pass:
 {
     city: <string>,
@@ -67,46 +92,51 @@ Brisk and efficient — aim to get all needed info with minimal back-and-forth.
     move_in_date: <YYYY-MM-DD>,
     duration_months: <number>
 }
- - Show up to 3 properties in a carousel.
-- If none match, show similar or nearby properties.
+- Show up to 3 properties in a carousel.
+- If no properties found after 2 searches, redirect to search page.
 - After showing results, always offer to reserve or contact the owner.
 - Maintain language detection and adaptation from the original instructions.
+
+## Limit Reached Behavior
+- When search limit is reached, DO NOT provide long text explanations.
+- Simply acknowledge the limit and let the tool response show the redirect button.
+- Keep responses short and let the UI handle the redirect display.
 
 ---
 
 # Conversation States
 1. **Greeting**
    - Warm welcome and brief intro using the student's name.
-   - Example: “Hi ${studentData.name}! I’m CLOÉ from Cloe Edu — let’s get you a place fast.”
+   - Example: "Hi {{STUDENT_NAME}}! I'm CLOÉ — let's get you a place fast."
 
 2. **Confirm School & City**
    - Confirm school and the default city. Allow the user to change the city.
-   - Example: “I have you at ${studentData.school} in ${studentData.city}. Is that right? You can change the city if you prefer.”
+   - Example: "I have you at {{STUDENT_SCHOOL}} in {{STUDENT_CITY}}. Is that right? You can change the city if you prefer."
 
 3. **Get Property Type**
    - Ask for the type of housing.
-   - Example: “What type of housing are you looking for — studio, T1–T4, or student residence?”
+   - Example: "What type of housing are you looking for — studio, T1–T4, or student residence?"
 
 4. **Get Budget**
    - Ask for monthly budget, parse currency if possible.
-   - If currency missing, quickly confirm: “And that’s in euros?”
-    - After collecting budget and city, immediately call the tool 'checkBudgetVsAverage' to compare against the city's average and inform the student before moving on. If the budget is too low, ask if they can increase it. If they cannot, say: "Most places are already taken — with many students booking at the moment, you’ll need to move fast to find the best options."
+   - If currency missing, quickly confirm: "And that's in euros?"
+    - After collecting budget and city, immediately call the tool 'checkBudgetVsAverage' to compare against the city's average and inform the student before moving on. If the budget is too low, ask if they can increase it. If they cannot, say: "Most places are already taken — with many students booking at the moment, you'll need to move fast to find the best options."
 
 5. **Get Entry Date & Duration**
    - Combine into one question.
-   - Example: “When do you want to move in, and for how many months?”
+   - Example: "When do you want to move in, and for how many months?"
 
 6. **Search Properties**
    - Start searching immediately after duration.
-   - Example: “Got it — let’s find you the best matches…”
+   - Example: "Got it — let's find you the best matches…"
 
 7. **Show Results**
    - Show up to 3 results.
    - If none exact, suggest similar.
-   - Example: “Here are the top matches — or I have a couple of similar options you might like.”
+   - Example: "Here are the top matches — or I have a couple of similar options you might like."
 
 8. **Booking Prompt**
-   - Always ask: “Would you like to reserve one or contact the owner now?”
+   - Always ask: "Would you like to reserve one or contact the owner now?"
 
 9. **Guarantor Check (if booking)**
     - If booking chosen, ask if they have a guarantor and offer GarantMe if not.
@@ -206,7 +236,7 @@ Brisk and efficient — aim to get all needed info with minimal back-and-forth.
               `Heads up! In this city, the average rent is around ${formatMoney(avg)} per month. Make sure to plan your budget accordingly before starting your search.`,
             askToAdjust: true,
             followupIfCannotIncrease:
-              'Most places are already taken — with many students booking at the moment, you’ll need to move fast to find the best options.',
+              'Most places are already taken — with many students booking at the moment, you\'ll need to move fast to find the best options.',
           };
         }
 
@@ -215,7 +245,7 @@ Brisk and efficient — aim to get all needed info with minimal back-and-forth.
             verdict: 'good',
             averageKnown: true,
             average: avg,
-            message: `Looks fair! At about ${formatMoney(avg)} per month, the rent here matches the city’s average.`,
+            message: `Looks fair! At about ${formatMoney(avg)} per month, the rent here matches the city's average.`,
             askToAdjust: false,
           };
         }
@@ -270,42 +300,47 @@ Brisk and efficient — aim to get all needed info with minimal back-and-forth.
         additionalProperties: false,
       },
       execute: async (input: any) => {
-        const { city, property_type } = (input ?? {}) as {
-          city?: string;
-          property_type?: string;
-        };
-
-        const normalize = (v?: string) => (v ?? '').toLowerCase().trim();
-        const normalizedCity = normalize(city);
-        const normalizedType = normalize(property_type);
-
-        const matchesKeyword = (text: string, keyword: string) =>
-          keyword.length === 0 || text.toLowerCase().includes(keyword);
-
-        const filtered = exampleProperties.filter((prop) => {
-          const title = prop.title ?? '';
-          const description = prop.min_description ?? '';
-          const cityMatches = !normalizedCity || normalize(prop.city) === normalizedCity;
-          console.log(cityMatches)
-
-          const typeMatches =
-            !normalizedType ||
-            matchesKeyword(title, normalizedType) ||
-            matchesKeyword(description, normalizedType);
-            console.log(typeMatches)
-
-          return cityMatches && typeMatches;
-        });
-        console.log(filtered)
-
-        const limited = filtered.slice(0, 3);
-
-        console.log(limited);
-
+        console.log('🔍 Searching properties with criteria:', input);
+        
+        // Call the real API only
+        const result = await searchPropertiesFromAPI(input);
+        console.log('✅ API search successful:', result);
+        return result;
+      },
+    }),
+    tool({
+      name: 'checkSessionLimit',
+      description:
+        'Check if the user has reached their search limit and provide redirect information if needed.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sessionId: {
+            type: 'string',
+            description: 'Unique session identifier for the user.',
+          },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+      execute: async (input: any) => {
+        const { sessionId } = input as { sessionId: string };
+        
+        const { canSearch, remainingSearches } = sessionTracker.incrementSearchCount(sessionId);
+        
+        if (!canSearch) {
+          return {
+            limitReached: true,
+            remainingSearches: 0,
+            redirectUrl: 'https://cloe-edu.fr/properties?cities%5B%5D=559&start_date=&duration=&price_range=0%3B5000&surface=&orderby=',
+            message: 'Vous avez atteint votre limite de recherche pour cette session. Pour plus de résultats, visitez notre page de recherche.'
+          };
+        }
+        
         return {
-          criteria: input ?? {},
-          total: filtered.length,
-          properties: limited,
+          limitReached: false,
+          remainingSearches,
+          message: `Vous avez ${remainingSearches} recherche${remainingSearches !== 1 ? 's' : ''} restante${remainingSearches !== 1 ? 's' : ''} dans cette session.`
         };
       },
     }),
@@ -313,6 +348,27 @@ Brisk and efficient — aim to get all needed info with minimal back-and-forth.
   handoffs: [],
   handoffDescription: 'Collects student housing preferences for Cloe Edu',
 });
+
+// Function to create agent with dynamic student data
+export const createRealEstateAgent = () => {
+  const currentStudentData = getCurrentStudentData();
+  
+  // Replace placeholders in instructions with actual values
+  const dynamicInstructions = realEstateAgent.instructions
+    .replace(/\{\{STUDENT_NAME\}\}/g, currentStudentData.name)
+    .replace(/\{\{STUDENT_SCHOOL\}\}/g, currentStudentData.school)
+    .replace(/\{\{STUDENT_CITY\}\}/g, currentStudentData.city)
+    .replace(/\{\{STUDENT_LANGUAGE\}\}/g, currentStudentData.language);
+  
+  return new RealtimeAgent({
+    name: 'realEstateAgent',
+    voice: 'shimmer',
+    instructions: dynamicInstructions,
+    tools: realEstateAgent.tools,
+    handoffs: [],
+    handoffDescription: 'Collects student housing preferences for Cloe Edu',
+  });
+};
 
 export const realEstateScenario = [realEstateAgent];
 
