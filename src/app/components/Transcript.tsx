@@ -165,24 +165,6 @@ function Transcript({
                     key={itemId}
                     className="flex flex-col justify-start items-start text-gray-500 text-sm"
                   >
-                    <span className="text-xs font-mono">{timestamp}</span>
-                    <div
-                      className={`whitespace-pre-wrap flex items-center font-mono text-sm text-gray-800 ${
-                        data ? "cursor-pointer" : ""
-                      }`}
-                      onClick={() => data && toggleTranscriptItemExpand(itemId)}
-                    >
-                      {data && (
-                        <span
-                          className={`text-gray-400 mr-1 transform transition-transform duration-200 select-none font-mono ${
-                            expanded ? "rotate-90" : "rotate-0"
-                          }`}
-                        >
-                          ▶
-                        </span>
-                      )}
-                      {title}
-                    </div>
                     {expanded && data && (
                       <div className="text-gray-800 text-left">
                         <pre className="border-l-2 ml-1 border-gray-200 whitespace-pre-wrap break-words font-mono text-xs mb-2 mt-2 pl-2">
@@ -229,22 +211,6 @@ function Transcript({
               }
             })}
         </div>
-      </div>
-
-      <div className="p-4 flex items-center gap-x-2 flex-shrink-0 border-t border-gray-200">
-        <input
-          ref={inputRef}
-          type="text"
-          value={userText}
-          onChange={(e) => setUserText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && canSend) {
-              onSendMessage();
-            }
-          }}
-          className="flex-1 px-4 py-2 focus:outline-none"
-          placeholder="Type a message..."
-        />
         <button
           onMouseDown={handleTalkButtonDown}
           onMouseUp={handleTalkButtonUp}
@@ -257,6 +223,18 @@ function Transcript({
             (!isPTTActive ? " bg-gray-100" : "")
           }
           aria-pressed={isPTTUserSpeaking}
+          style={{
+            backgroundColor:
+              isPTTActive && !isPTTUserSpeaking ? "rgb(243 136 47)" : undefined,
+            width: "85px",
+            height: "100px",
+            alignSelf: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "20px",
+            borderRadius: "50%",
+          }}
         >
           <span
             className={
@@ -281,6 +259,22 @@ function Transcript({
             </svg>
           </span>
         </button>
+      </div>
+
+      <div className="p-4 flex items-center gap-x-2 flex-shrink-0 border-t border-gray-200">
+        <input
+          ref={inputRef}
+          type="text"
+          value={userText}
+          onChange={(e) => setUserText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && canSend) {
+              onSendMessage();
+            }
+          }}
+          className="flex-1 px-4 py-2 focus:outline-none"
+          placeholder="Type a message..."
+        />
 
         <button
           onClick={onSendMessage}
