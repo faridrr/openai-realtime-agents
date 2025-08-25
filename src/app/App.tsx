@@ -27,7 +27,7 @@ import {
 } from "@/app/agentConfigs/realEstate";
 
 // Map used by connect logic for scenarios defined via the SDK.
-const sdkScenarioMap: Record<string, RealtimeAgent[]> = {
+const sdkScenarioMap: Record<string, RealtimeAgent<any>[]> = {
   realEstate: [createRealEstateAgent()],
 };
 
@@ -54,7 +54,7 @@ function App() {
 
   const [selectedAgentName, setSelectedAgentName] = useState<string>("");
   const [selectedAgentConfigSet, setSelectedAgentConfigSet] = useState<
-    RealtimeAgent[] | null
+    RealtimeAgent<any>[] | null
   >(null);
 
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
@@ -82,7 +82,7 @@ function App() {
     };
   }, []);
 
-  const { connect, disconnect, sendUserText, sendEvent, interrupt, mute } =
+  const { connect, sendUserText, sendEvent, interrupt, mute } =
     useRealtimeSession({
       onConnectionChange: (s) => setSessionStatus(s as SessionStatus),
       onAgentHandoff: (agentName: string) => {
@@ -226,12 +226,6 @@ function App() {
     }
   };
 
-  const disconnectFromRealtime = () => {
-    disconnect();
-    setSessionStatus("DISCONNECTED");
-    setIsPTTUserSpeaking(false);
-  };
-
   const sendSimulatedUserMessage = (text: string) => {
     const id = uuidv4().slice(0, 32);
     addTranscriptMessage(id, "user", text, true);
@@ -308,15 +302,6 @@ function App() {
     setIsPTTUserSpeaking(false);
     sendClientEvent({ type: "input_audio_buffer.commit" }, "commit PTT");
     sendClientEvent({ type: "response.create" }, "trigger response PTT");
-  };
-
-  const onToggleConnection = () => {
-    if (sessionStatus === "CONNECTED" || sessionStatus === "CONNECTING") {
-      disconnectFromRealtime();
-      setSessionStatus("DISCONNECTED");
-    } else {
-      connectToRealtime();
-    }
   };
 
   // // Because we need a new connection, refresh the page when codec changes

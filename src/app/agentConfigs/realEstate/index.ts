@@ -381,12 +381,20 @@ The student information will be provided dynamically through URL parameters. Use
 export const createRealEstateAgent = () => {
   const currentStudentData = getCurrentStudentData();
   
-  // Replace placeholders in instructions with actual values
-  const dynamicInstructions = realEstateAgent.instructions
-    .replace(/\{\{STUDENT_NAME\}\}/g, currentStudentData.name)
-    .replace(/\{\{STUDENT_SCHOOL\}\}/g, currentStudentData.school)
-    .replace(/\{\{STUDENT_CITY\}\}/g, currentStudentData.city)
-    .replace(/\{\{STUDENT_LANGUAGE\}\}/g, currentStudentData.language);
+  // Handle instructions which can be either a string or a function
+  let dynamicInstructions: string;
+  if (typeof realEstateAgent.instructions === 'string') {
+    // Replace placeholders in instructions with actual values
+    dynamicInstructions = realEstateAgent.instructions
+      .replace(/\{\{STUDENT_NAME\}\}/g, currentStudentData.name)
+      .replace(/\{\{STUDENT_SCHOOL\}\}/g, currentStudentData.school)
+      .replace(/\{\{STUDENT_CITY\}\}/g, currentStudentData.city)
+      .replace(/\{\{STUDENT_LANGUAGE\}\}/g, currentStudentData.language);
+  } else {
+    // If instructions is a function, we need to handle it differently
+    // For now, use the original instructions and handle placeholders at runtime
+    dynamicInstructions = realEstateAgent.instructions as any;
+  }
   
   return new RealtimeAgent({
     name: 'realEstateAgent',

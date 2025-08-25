@@ -10,9 +10,10 @@ export const averagePrices = {
 }
 
 export const studentData = {
-  name: "FARID",
-  school: "ENSEEIHT",
+  name: "test user",
+  school: "test school",
   city: "Paris",
+  language: "French",
 }
 
 
